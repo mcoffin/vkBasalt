@@ -1,0 +1,41 @@
+name: Build
+
+on: [push]
+
+jobs:
+
+  build-ubuntu:
+    runs-on: ubuntu-latest
+    container: ubuntu:eoan
+
+    steps:
+    - name: clone
+      uses: actions/checkout@v1
+      with:
+        submodules: recursive
+
+    - name: install-deps
+      shell: bash
+      run: |
+        set -e
+        dpkg --add-architecture i386
+        apt update
+        apt install -y \
+          build-essential \
+          meson \
+          gcc-multilib g++-multilib \
+          glslang-tools \
+          libvulkan-dev libvulkan-dev:i386 \
+          vulkan-validationlayers-dev vulkan-validationlayers-dev:i386 \
+          vulkan-tools \
+          spirv-tools
+
+    - name: make
+      run: |
+        make install PREFIX=$(pwd)/results
+
+    - name: upload
+      uses: actions/upload-artifact@v1
+      with:
+        name: vkbasalt-ubuntu-results
+        path: results
