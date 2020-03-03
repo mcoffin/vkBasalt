@@ -65,6 +65,7 @@ vkbasalt = shared_library(
     'config.cpp',
     'effect.cpp',
     'effect_fxaa.cpp',
+    'logger.cpp',
     'reshade_uniforms.cpp'
   ],
   include_directories: [spirv_include_dir],

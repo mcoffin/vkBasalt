@@ -26,6 +26,7 @@
 #include "fake_swapchain.hpp"
 #include "renderpass.hpp"
 #include "format.hpp"
+#include "layer.hpp"
 #include "logger.hpp"
 
 #include "effect.hpp"
