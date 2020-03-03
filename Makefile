@@ -6,11 +6,12 @@ DESTDIR ?= /
 PREFIX ?= $(HOME)/.local
 
 PKG_CONFIG_PATH_32 ?= /usr/lib32/pkgconfig
+LIBDIR_32 ?= lib32
 
 MESON_FILES := meson.build src/meson.build shader/meson.build config/meson.build meson_options.txt
 MESON_FLAGS += --buildtype release --prefix $(PREFIX)
 MESON_CROSS_FILE_32 ?= meson-32-cross.txt
-MESON_FLAGS_32 += --libdir=lib32
+MESON_FLAGS_32 += --libdir=$(LIBDIR_32)
 MESON_FLAGS_32 += --pkg-config-path $(PKG_CONFIG_PATH_32)
 MESON_FLAGS_32 += --cross-file $(MESON_CROSS_FILE_32)
 
