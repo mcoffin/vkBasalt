@@ -34,7 +34,7 @@ jobs:
 
     - name: make
       run: |
-        make install PREFIX=$(pwd)/results LIBDIR_32=lib/i386-linux-gnu
+        make install PREFIX=$(pwd)/results
 
     - name: upload
       uses: actions/upload-artifact@v1
