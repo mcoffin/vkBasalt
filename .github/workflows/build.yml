@@ -4,7 +4,7 @@ on: [push]
 
 jobs:
 
-  build-ubuntu:
+  ubuntu-make:
     runs-on: ubuntu-latest
     container: ubuntu:eoan
 
@@ -34,10 +34,48 @@ jobs:
 
     - name: make
       run: |
-        make install PREFIX=$(pwd)/results
+        make install PREFIX=$(pwd)/results-ubuntu
 
     - name: upload
       uses: actions/upload-artifact@v1
       with:
         name: vkbasalt-ubuntu-results
-        path: results
+        path: results-ubuntu
+
+  archlinux-make:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+
+    steps:
+    - name: clone
+      uses: actions/checkout@v1
+      with:
+        submodules: recursive
+
+    - name: install-deps
+      shell: bash
+      run: |
+        set -e
+        echo '[multilib]' >> /etc/pacman.conf
+        echo 'Include = /etc/pacman.d/mirrorlist' >> /etc/pacman.conf
+        pacman --noconfirm -Suy
+        pacman --noconfirm -S \
+          base-devel multilib-devel \
+          meson \
+          pkgconf \
+          vulkan-headers \
+          vulkan-validation-layers \
+          vulkan-icd-loader lib32-vulkan-icd-loader \
+          glslang \
+          libx11 lib32-libx11 \
+          spirv-tools
+
+    - name: make
+      run: |
+        make install PREFIX=$(pwd)/results-archlinux
+
+    - name: upload
+      uses: actions/upload-artifact@v1
+      with:
+        name: vkbasalt-archlinux-results
+        path: results-archlinux
