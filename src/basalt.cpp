@@ -10,6 +10,7 @@
 #include <cstring>
 
 #include "util.hpp"
+#include "keyboard_input.hpp"
 
 #include "logical_device.hpp"
 #include "logical_swapchain.hpp"
@@ -268,16 +269,8 @@ namespace vkBasalt
         deviceMap.erase(GetKey(device));
     }
 
-    VKAPI_ATTR void VKAPI_CALL vkBasalt_GetDeviceQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue* pQueue)
+    static void saveDeviceQueue(std::shared_ptr<LogicalDevice> pLogicalDevice, uint32_t queueFamilyIndex, VkQueue* pQueue)
     {
-        scoped_lock l(globalLock);
-
-        Logger::trace("vkGetDeviceQueue");
-
-        std::shared_ptr<LogicalDevice> pLogicalDevice = deviceMap[GetKey(device)];
-
-        pLogicalDevice->vkd.GetDeviceQueue(device, queueFamilyIndex, queueIndex, pQueue);
-
         if (pLogicalDevice->queue != VK_NULL_HANDLE)
         {
             return; // we allready have a queue
@@ -314,10 +307,36 @@ namespace vkBasalt
             commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex;
 
             Logger::debug("found graphic capable queue");
-            pLogicalDevice->vkd.CreateCommandPool(device, &commandPoolCreateInfo, nullptr, &pLogicalDevice->commandPool);
+            pLogicalDevice->vkd.CreateCommandPool(pLogicalDevice->device, &commandPoolCreateInfo, nullptr, &pLogicalDevice->commandPool);
             pLogicalDevice->queue            = *pQueue;
             pLogicalDevice->queueFamilyIndex = queueFamilyIndex;
         }
+    }
+
+    VKAPI_ATTR void VKAPI_CALL vkBasalt_GetDeviceQueue2(VkDevice device, const VkDeviceQueueInfo2* pQueueInfo, VkQueue* pQueue)
+    {
+        scoped_lock l(globalLock);
+
+        Logger::trace("vkGetDeviceQueue2");
+
+        std::shared_ptr<LogicalDevice> pLogicalDevice = deviceMap[GetKey(device)];
+
+        pLogicalDevice->vkd.GetDeviceQueue2(device, pQueueInfo, pQueue);
+
+        saveDeviceQueue(pLogicalDevice, pQueueInfo->queueFamilyIndex, pQueue);
+    }
+
+    VKAPI_ATTR void VKAPI_CALL vkBasalt_GetDeviceQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue* pQueue)
+    {
+        scoped_lock l(globalLock);
+
+        Logger::trace("vkGetDeviceQueue");
+
+        std::shared_ptr<LogicalDevice> pLogicalDevice = deviceMap[GetKey(device)];
+
+        pLogicalDevice->vkd.GetDeviceQueue(device, queueFamilyIndex, queueIndex, pQueue);
+
+        saveDeviceQueue(pLogicalDevice, queueFamilyIndex, pQueue);
     }
 
     VKAPI_ATTR VkResult VKAPI_CALL vkBasalt_CreateSwapchainKHR(VkDevice                        device,
@@ -356,10 +375,8 @@ namespace vkBasalt
 
             modifiedCreateInfo.pNext = &imageFormatListCreateInfo;
         }
-        else
-        {
-            modifiedCreateInfo.imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-        }
+
+        modifiedCreateInfo.imageUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
         Logger::debug("format " + std::to_string(modifiedCreateInfo.imageFormat));
         std::shared_ptr<LogicalSwapchain> pLogicalSwapchain(new LogicalSwapchain());
@@ -402,7 +419,6 @@ namespace vkBasalt
 
         pLogicalSwapchain->imageCount = *pCount;
         pLogicalSwapchain->images.reserve(*pCount);
-        pLogicalSwapchain->commandBuffers.reserve(*pCount);
 
         std::string effectOption = pConfig->getOption("effects", "cas");
 
@@ -520,20 +536,43 @@ namespace vkBasalt
         Logger::debug("effect string count: " + std::to_string(effectStrings.size()));
         Logger::debug("effect count: " + std::to_string(pLogicalSwapchain->effects.size()));
 
-        pLogicalSwapchain->commandBuffers = allocateCommandBuffer(pLogicalDevice, pLogicalSwapchain->imageCount);
-        Logger::debug("allocated ComandBuffers " + std::to_string(pLogicalSwapchain->commandBuffers.size()) + " for swapchain "
+        pLogicalSwapchain->commandBuffersEffect = allocateCommandBuffer(pLogicalDevice, pLogicalSwapchain->imageCount);
+        Logger::debug("allocated ComandBuffers " + std::to_string(pLogicalSwapchain->commandBuffersEffect.size()) + " for swapchain "
                       + convertToString(swapchain));
 
-        writeCommandBuffers(pLogicalDevice, pLogicalSwapchain->effects, depthImage, depthImageView, depthFormat, pLogicalSwapchain->commandBuffers);
+        writeCommandBuffers(
+            pLogicalDevice, pLogicalSwapchain->effects, depthImage, depthImageView, depthFormat, pLogicalSwapchain->commandBuffersEffect);
         Logger::debug("wrote CommandBuffers");
 
         pLogicalSwapchain->semaphores = createSemaphores(pLogicalDevice, pLogicalSwapchain->imageCount);
         Logger::debug("created semaphores");
         for (unsigned int i = 0; i < pLogicalSwapchain->imageCount; i++)
         {
-            Logger::debug(std::to_string(i) + " writen commandbuffer " + convertToString(pLogicalSwapchain->commandBuffers[i]));
+            Logger::debug(std::to_string(i) + " writen commandbuffer " + convertToString(pLogicalSwapchain->commandBuffersEffect[i]));
         }
         Logger::trace("vkGetSwapchainImagesKHR");
+
+        pLogicalSwapchain->defaultTransfer = std::shared_ptr<Effect>(new TransferEffect(
+            pLogicalDevice,
+            pLogicalSwapchain->format,
+            pLogicalSwapchain->imageExtent,
+            std::vector<VkImage>(pLogicalSwapchain->fakeImages.begin(), pLogicalSwapchain->fakeImages.begin() + pLogicalSwapchain->imageCount),
+            pLogicalSwapchain->images,
+            pConfig));
+
+        pLogicalSwapchain->commandBuffersNoEffect = allocateCommandBuffer(pLogicalDevice, pLogicalSwapchain->imageCount);
+
+        writeCommandBuffers(pLogicalDevice,
+                            {pLogicalSwapchain->defaultTransfer},
+                            VK_NULL_HANDLE,
+                            VK_NULL_HANDLE,
+                            VK_FORMAT_UNDEFINED,
+                            pLogicalSwapchain->commandBuffersNoEffect);
+
+        for (unsigned int i = 0; i < pLogicalSwapchain->imageCount; i++)
+        {
+            Logger::debug(std::to_string(i) + " writen commandbuffer " + convertToString(pLogicalSwapchain->commandBuffersNoEffect[i]));
+        }
 
         return result;
     }
@@ -541,6 +580,33 @@ namespace vkBasalt
     VKAPI_ATTR VkResult VKAPI_CALL vkBasalt_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPresentInfo)
     {
         scoped_lock l(globalLock);
+
+        static bool pressed       = false;
+        static bool presentEffect = true;
+        int         toggle        = 0;
+
+        if (isKeyPressed(XK_Home))
+        {
+            if (!pressed)
+            {
+                toggle        = 1;
+                presentEffect = !presentEffect;
+                pressed       = true;
+            }
+        }
+        else
+        {
+            if (pressed)
+            {
+                toggle  = -1;
+                pressed = false;
+            }
+        }
+
+        if (toggle)
+        {
+            Logger::trace("toggled " + std::to_string(toggle));
+        }
 
         std::shared_ptr<LogicalDevice> pLogicalDevice = deviceMap[GetKey(queue)];
 
@@ -563,13 +629,14 @@ namespace vkBasalt
             waitStages.resize(pPresentInfo->waitSemaphoreCount, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
             VkSubmitInfo submitInfo;
-            submitInfo.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-            submitInfo.pNext                = nullptr;
-            submitInfo.waitSemaphoreCount   = 0;
-            submitInfo.pWaitSemaphores      = nullptr;
-            submitInfo.pWaitDstStageMask    = nullptr;
-            submitInfo.commandBufferCount   = 1;
-            submitInfo.pCommandBuffers      = &(pLogicalSwapchain->commandBuffers[index]);
+            submitInfo.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+            submitInfo.pNext              = nullptr;
+            submitInfo.waitSemaphoreCount = 0;
+            submitInfo.pWaitSemaphores    = nullptr;
+            submitInfo.pWaitDstStageMask  = nullptr;
+            submitInfo.commandBufferCount = 1;
+            submitInfo.pCommandBuffers =
+                presentEffect ? &(pLogicalSwapchain->commandBuffersEffect[index]) : &(pLogicalSwapchain->commandBuffersNoEffect[index]);
             submitInfo.signalSemaphoreCount = 1;
             submitInfo.pSignalSemaphores    = &(pLogicalSwapchain->semaphores[index]);
 
@@ -671,18 +738,18 @@ namespace vkBasalt
                 std::shared_ptr<LogicalSwapchain> pLogicalSwapchain = it.second;
                 if (pLogicalSwapchain->pLogicalDevice == pLogicalDevice)
                 {
-                    if (pLogicalSwapchain->commandBuffers.size())
+                    if (pLogicalSwapchain->commandBuffersEffect.size())
                     {
                         pLogicalDevice->vkd.FreeCommandBuffers(pLogicalDevice->device,
                                                                pLogicalDevice->commandPool,
-                                                               pLogicalSwapchain->commandBuffers.size(),
-                                                               pLogicalSwapchain->commandBuffers.data());
-                        pLogicalSwapchain->commandBuffers.clear();
-                        pLogicalSwapchain->commandBuffers = allocateCommandBuffer(pLogicalDevice, pLogicalSwapchain->imageCount);
+                                                               pLogicalSwapchain->commandBuffersEffect.size(),
+                                                               pLogicalSwapchain->commandBuffersEffect.data());
+                        pLogicalSwapchain->commandBuffersEffect.clear();
+                        pLogicalSwapchain->commandBuffersEffect = allocateCommandBuffer(pLogicalDevice, pLogicalSwapchain->imageCount);
                         Logger::debug("allocated CommandBuffers for swapchain " + convertToString(it.first));
 
                         writeCommandBuffers(
-                            pLogicalDevice, pLogicalSwapchain->effects, image, depthImageView, depthFormat, pLogicalSwapchain->commandBuffers);
+                            pLogicalDevice, pLogicalSwapchain->effects, image, depthImageView, depthFormat, pLogicalSwapchain->commandBuffersEffect);
                         Logger::debug("wrote CommandBuffers");
                     }
                 }
@@ -718,14 +785,14 @@ namespace vkBasalt
                     std::shared_ptr<LogicalSwapchain> pLogicalSwapchain = it.second;
                     if (pLogicalSwapchain->pLogicalDevice == pLogicalDevice)
                     {
-                        if (pLogicalSwapchain->commandBuffers.size())
+                        if (pLogicalSwapchain->commandBuffersEffect.size())
                         {
                             pLogicalDevice->vkd.FreeCommandBuffers(pLogicalDevice->device,
                                                                    pLogicalDevice->commandPool,
-                                                                   pLogicalSwapchain->commandBuffers.size(),
-                                                                   pLogicalSwapchain->commandBuffers.data());
-                            pLogicalSwapchain->commandBuffers.clear();
-                            pLogicalSwapchain->commandBuffers = allocateCommandBuffer(pLogicalDevice, pLogicalSwapchain->imageCount);
+                                                                   pLogicalSwapchain->commandBuffersEffect.size(),
+                                                                   pLogicalSwapchain->commandBuffersEffect.data());
+                            pLogicalSwapchain->commandBuffersEffect.clear();
+                            pLogicalSwapchain->commandBuffersEffect = allocateCommandBuffer(pLogicalDevice, pLogicalSwapchain->imageCount);
                             Logger::debug("allocated CommandBuffers for swapchain " + convertToString(it.first));
 
                             writeCommandBuffers(pLogicalDevice,
@@ -733,7 +800,7 @@ namespace vkBasalt
                                                 depthImage,
                                                 depthImageView,
                                                 depthFormat,
-                                                pLogicalSwapchain->commandBuffers);
+                                                pLogicalSwapchain->commandBuffersEffect);
                             Logger::debug("wrote CommandBuffers");
                         }
                     }
@@ -839,6 +906,7 @@ extern "C"
         GETPROCADDR(CreateDevice);
         GETPROCADDR(DestroyDevice);
         GETPROCADDR(GetDeviceQueue);
+        GETPROCADDR(GetDeviceQueue2);
         GETPROCADDR(CreateSwapchainKHR);
         GETPROCADDR(GetSwapchainImagesKHR);
         GETPROCADDR(QueuePresentKHR);
@@ -879,6 +947,7 @@ extern "C"
         GETPROCADDR(CreateDevice);
         GETPROCADDR(DestroyDevice);
         GETPROCADDR(GetDeviceQueue);
+        GETPROCADDR(GetDeviceQueue2);
         GETPROCADDR(CreateSwapchainKHR);
         GETPROCADDR(GetSwapchainImagesKHR);
         GETPROCADDR(QueuePresentKHR);
