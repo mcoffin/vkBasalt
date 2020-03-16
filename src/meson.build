@@ -1,6 +1,7 @@
 src_directory = include_directories('.')
 
 vulkan = dependency('vulkan')
+x11 = dependency('x11')
 
 reshade_dir = join_paths('..', 'reshade')
 
@@ -66,11 +67,12 @@ vkbasalt = shared_library(
     'effect.cpp',
     'effect_fxaa.cpp',
     'logger.cpp',
+    'keyboard_input.cpp',
     'reshade_uniforms.cpp'
   ],
   include_directories: [spirv_include_dir],
   cpp_args: ['-Wno-unused-parameter'],
-  dependencies: [vulkan],
+  dependencies: [vulkan, x11],
   link_with: [reshade_effects],
   install: true
 )

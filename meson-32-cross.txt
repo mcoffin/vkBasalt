@@ -3,6 +3,7 @@ c = 'gcc'
 cpp = 'g++'
 ar = 'ar'
 strip = 'strip'
+pkgconfig = 'i686-linux-gnu-pkg-config'
 
 [properties]
 c_args = ['-m32']

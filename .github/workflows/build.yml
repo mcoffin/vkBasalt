@@ -23,10 +23,12 @@ jobs:
         apt install -y \
           build-essential \
           meson \
+          pkg-config pkg-config-i686-linux-gnu \
           gcc-multilib g++-multilib \
           glslang-tools \
           libvulkan-dev libvulkan-dev:i386 \
           vulkan-validationlayers-dev vulkan-validationlayers-dev:i386 \
+          libx11-dev libx11-dev:i386 \
           vulkan-tools \
           spirv-tools
 
