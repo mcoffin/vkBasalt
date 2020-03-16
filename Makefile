@@ -5,13 +5,10 @@
 DESTDIR ?= /
 PREFIX ?= $(HOME)/.local
 
-PKG_CONFIG_PATH_32 ?= /usr/lib32/pkgconfig
-
 MESON_FILES := meson.build src/meson.build shader/meson.build config/meson.build meson_options.txt
 MESON_FLAGS += --buildtype release --prefix $(PREFIX)
-MESON_CROSS_FILE_32 ?= meson-32-cross.txt
-MESON_FLAGS_32 += --libdir=lib32
-MESON_FLAGS_32 += --pkg-config-path $(PKG_CONFIG_PATH_32)
+DIST_ID ?= $(shell . /etc/os-release; echo $$ID)
+MESON_CROSS_FILE_32 ?= meson-m32-$(DIST_ID).txt
 MESON_FLAGS_32 += --cross-file $(MESON_CROSS_FILE_32)
 
 INSTALL_BUILD_DIRS := build/Release32 build/Release64

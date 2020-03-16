@@ -7,9 +7,13 @@ namespace vkBasalt
         if (imageCount > 0)
         {
             effects.clear();
+            defaultTransfer.reset();
 
-            pLogicalDevice->vkd.FreeCommandBuffers(pLogicalDevice->device, pLogicalDevice->commandPool, imageCount, commandBuffers.data());
-            std::cout << "after free commandbuffer" << std::endl;
+            pLogicalDevice->vkd.FreeCommandBuffers(
+                pLogicalDevice->device, pLogicalDevice->commandPool, commandBuffersEffect.size(), commandBuffersEffect.data());
+            pLogicalDevice->vkd.FreeCommandBuffers(
+                pLogicalDevice->device, pLogicalDevice->commandPool, commandBuffersNoEffect.size(), commandBuffersNoEffect.data());
+            Logger::debug("after free commandbuffer");
 
             pLogicalDevice->vkd.FreeMemory(pLogicalDevice->device, fakeImageMemory, nullptr);
 
@@ -22,7 +26,7 @@ namespace vkBasalt
             {
                 pLogicalDevice->vkd.DestroySemaphore(pLogicalDevice->device, semaphores[i], nullptr);
             }
-            std::cout << "after DestroySemaphore" << std::endl;
+            Logger::debug("after DestroySemaphore");
         }
     }
 } // namespace vkBasalt

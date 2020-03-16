@@ -3,12 +3,16 @@ c = 'gcc'
 cpp = 'g++'
 ar = 'ar'
 strip = 'strip'
+pkgconfig = 'i686-linux-gnu-pkg-config'
 
 [properties]
 c_args = ['-m32']
 c_link_args = ['-m32']
 cpp_args = ['-m32']
 cpp_link_args = ['-m32']
+
+[paths]
+libdir = 'lib/i386-linux-gnu'
 
 [host_machine]
 system = 'linux'

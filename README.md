@@ -22,25 +22,28 @@ make install
 ```
 **Note: do not run this with `sudo`. vkBasalt gets installed for the current user only.**
 
-## Prerequisites
+## Build Dependencies
+
+### Prerequisites
 Before building, you will need:
 - Vulkan SDK
 - glslangValidator - To compile the shader
 - GCC >=9
+- X11 development files
 
 See below on how to install them.
 
-### Arch-based distributions
+#### Arch-based distributions
 For Arch-based distributions, execute:
 ```
-pacman -Syu glslang vulkan-headers vulkan-tools vulkan-validation-layers
+pacman -Syu glslang vulkan-headers vulkan-tools vulkan-validation-layers lib32-libx11 libx11
 ```
-### Fedora
+#### Fedora
 For Fedora, execute:
 ```
-sudo dnf install vulkan-headers vulkan-tools vulkan-validation-layers vulkan-validation-layers-devel glslang glibc-devel.i686 libstdc++-devel.i686 spirv-tools
+sudo dnf install vulkan-headers vulkan-tools vulkan-validation-layers vulkan-validation-layers-devel glslang libX11-devel glibc-devel.i686 libstdc++-devel.i686 spirv-tools libX11-devel.i686
 ```
-### Gentoo-based distributions
+#### Gentoo-based distributions
 For Gentoo-based distributions, execute:
 ```
 sudo emerge -v dev-util/glslang dev-util/vulkan-headers dev-util/vulkan-tools media-libs/vulkan-layers media-libs/vulkan-loader dev-util/spirv-tools
@@ -88,6 +91,10 @@ The config file will be searched for in the following locations:
 
 If you want to make changes for one game only, you can create a file named `vkBasalt.conf` in the working directory of the game and change the values there.
 
+## Ingame Input
+
+The [HOME key](https://en.wikipedia.org/wiki/Home_key) can be used to disable and re enable the applied effects. This is based on X11 so it won't work on pure wayland. It **should** however at least not crash without X11.
+
 #### Reshade Fx shaders
 
 To run reshade fx shaders e.g. shaders from the [reshade repo](https://github.com/crosire/reshade-shaders), you have to set `reshadeTexturePath` and `reshadeIncludePath` to the matching dirctories from the repo. To then use a specific shader you need to set a custom effect name to the shader path and then add that effect name to `effects` like every other effect.
@@ -100,6 +107,13 @@ denoise = /home/user/reshade-shaders/Shaders/Denoise.fx
 reshadeTexturePath = /home/user/reshade-shaders/Textures
 reshadeIncludePath = /home/user/reshade-shaders/Shaders
 ```
+
+#### Debug Output
+
+The amount of debug output can be set with the `VKBASALT_LOG_LEVEL` env var, e.g. `VKBASALT_LOG_LEVEL=debug`. Possible values are: `trace, debug, info, warn, error, none`.
+
+By default the logger outputs to stderr, a file as output location can be set with the `VKBASALT_LOG_FILE` env var, e.g. `VKBASALT_LOG_FILE="vkBasalt.log"`.
+
 
 ## FAQ
 
